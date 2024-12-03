@@ -1,0 +1,6 @@
+[submodule "pcse"]
+	path = pcse
+	url = git@github.com:ajwdewit/pcse.git
+[submodule "PCSE-Gym"]
+	path = PCSE-Gym
+	url = https://github.com/BigDataWUR/PCSE-Gym.git
