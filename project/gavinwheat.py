@@ -1,3 +1,4 @@
+import warnings
 import datetime
 import gymnasium as gym
 import numpy as np
@@ -8,6 +9,8 @@ from pcse_gym.utils import process_pcse_output as process_pcse
 from pcse_gym.envs.sb3 import ZeroNitrogenEnvStorage, StableBaselinesWrapper
 from pcse_gym.envs.rewards import Rewards
 
+# Suppress specific matplotlib legend warning
+warnings.filterwarnings('ignore', message='No artists with labels found to put in legend')
 
 class GavinWheat(gym.Env):
     """
@@ -107,7 +110,6 @@ class GavinWheat(gym.Env):
             zero_nitrogen_results = self.zero_nitrogen_env_storage.get_episode_output(
                 self.baseline_env
             )
-            # convert zero_nitrogen_results to pcse_output
             var_name = process_pcse.get_name_storage_organ(zero_nitrogen_results.keys())
             for k, v in zero_nitrogen_results[var_name].items():
                 if k <= output[-1]["day"]:
@@ -115,6 +117,38 @@ class GavinWheat(gym.Env):
                     output_baseline.append(filtered_dict)
 
         reward, growth = self.get_reward_func(output, amount, output_baseline)
+        
+        # Get current day of simulation
+        current_day = output[-1]["day"].timetuple().tm_yday
+        
+        # Define growth stages (approximate days)
+        early_stage = current_day < 120  # Early growth
+        mid_stage = 120 <= current_day < 240  # Main growth period
+        late_stage = current_day >= 240  # Late stage
+        
+        if growth == 0:
+            if early_stage:
+                # Very small penalties in early stage
+                reward = -1.0 if amount > 0 else 0.0
+            elif mid_stage:
+                # Moderate penalties in main growth stage
+                reward = -3.0 if amount > 0 else -1.0
+            else:  # late_stage
+                # Larger penalties in late stage
+                reward = -5.0 if amount > 0 else -2.0
+        else:
+            # Scale rewards based on growth stage
+            if early_stage:
+                reward = reward * 2.0  # Encourage early successful actions
+            elif mid_stage:
+                reward = reward * 1.5  # Good rewards for main growth period
+            else:
+                reward = reward * 1.0  # Normal rewards for late stage
+        
+        # Add small positive reward for doing nothing when there's no growth potential
+        if amount == 0 and growth == 0 and early_stage:
+            reward = 0.5
+            
         return reward, growth
 
     def get_reward_func(self, output, amount, output_baseline=None):

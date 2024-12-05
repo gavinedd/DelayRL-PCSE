@@ -9,13 +9,13 @@ import sys
 import os
 import torch.nn as nn
 from stable_baselines3.common.callbacks import BaseCallback
+from tqdm import tqdm
 
 from project.gavinwheat import GavinWheat
 from pcse_gym.envs.sb3 import get_policy_kwargs, get_model_kwargs
 from pcse_gym.utils.eval import EvalCallback, determine_and_log_optimum
 import pcse_gym.utils.defaults as defaults
 
-# Rest of implementation identical to train_winterwheat.py but using GavinWheat instead of WinterWheat
 path_to_program = lib_programname.get_path_executed_script()
 rootdir = path_to_program.parents[0]
 
@@ -26,31 +26,6 @@ if rootdir not in sys.path:
 if os.path.join(rootdir, "pcse_gym") not in sys.path:
     sys.path.insert(0, os.path.join(rootdir, "pcse_gym"))
 ...
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--device', type=str, default='cpu', help='Device to run on (cpu or cuda)')
-    parser.add_argument('--seed', type=int, default=0, help='Random seed')
-    parser.add_argument('--agent', type=str, default='PPO', help='RL agent. PPO, RPPO, or DQN.')
-    parser.add_argument('--reward', type=str, default='DEF', help='Reward function. DEF, or GRO')
-    parser.add_argument('--eval_freq', type=int, default=1000, 
-                       help='Frequency of evaluation (in steps). Default: 1000')
-    return parser.parse_args()
-
-class ProgressCallback(BaseCallback):
-    def __init__(self, eval_callback, total_timesteps):
-        super().__init__()
-        self.eval_callback = eval_callback
-        self.total_timesteps = total_timesteps
-        
-    def _on_step(self):
-        if self.n_calls % self.eval_callback.eval_freq == 0 or self.n_calls == 1:
-            print(f"\nEvaluating at step {self.n_calls}/{self.total_timesteps}")
-        self.eval_callback.model = self.model
-        return self.eval_callback._on_step()
-
-    def _init_callback(self):
-        self.eval_callback.model = self.model
-
 def train(log_dir, n_steps,
           crop_features=defaults.get_wofost_default_crop_features(),
           weather_features=defaults.get_default_weather_features(),
@@ -62,6 +37,7 @@ def train(log_dir, n_steps,
           action_space=defaults.get_default_action_space(),
           pcse_model=0, agent=PPO, reward=None,
           seed=0, tag="Exp", costs_nitrogen=10.0,
+          eval_freq=1000,
           **kwargs):
     """
     Train a PPO agent (Stable Baselines3).
@@ -90,14 +66,25 @@ def train(log_dir, n_steps,
 
     print(f'Train model {pcse_model_name} with {agent} algorithm and seed {seed}. Logdir: {log_dir}')
     if agent in ('PPO', 'RPPO'):
-        hyperparams = {'batch_size': 64, 'n_steps': 2048, 'learning_rate': 0.0003, 'ent_coef': 0.0, 'clip_range': 0.3,
-                       'n_epochs': 10, 'gae_lambda': 0.95, 'max_grad_norm': 0.5, 'vf_coef': 0.5,
-                       'policy_kwargs': get_policy_kwargs(n_crop_features=len(crop_features),
-                                                          n_weather_features=len(weather_features),
-                                                          n_action_features=len(action_features))}
-        hyperparams['policy_kwargs']['net_arch'] = dict(pi=[256, 256], vf=[256, 256])
-        hyperparams['policy_kwargs']['activation_fn'] = nn.Tanh
-        hyperparams['policy_kwargs']['ortho_init'] = False
+        hyperparams = {
+            'batch_size': 64,
+            'n_steps': 2048,
+            'learning_rate': 3e-4,
+            'ent_coef': 0.01,
+            'clip_range': 0.2,
+            'n_epochs': 10,
+            'gae_lambda': 0.95,
+            'max_grad_norm': 0.5,
+            'vf_coef': 0.5,
+            'policy_kwargs': get_policy_kwargs(
+                n_crop_features=len(crop_features),
+                n_weather_features=len(weather_features),
+                n_action_features=len(action_features)
+            )
+        }
+        hyperparams['policy_kwargs']['net_arch'] = dict(pi=[64, 64], vf=[64, 64])
+        hyperparams['policy_kwargs']['activation_fn'] = nn.ReLU
+        hyperparams['policy_kwargs']['ortho_init'] = True
     if agent == 'DQN':
         hyperparams = {'exploration_fraction': 0.1, 'exploration_initial_eps': 1.0, 'exploration_final_eps': 0.01,
                        'policy_kwargs': get_policy_kwargs(n_crop_features=len(crop_features),
@@ -154,8 +141,7 @@ def train(log_dir, n_steps,
                                 **get_model_kwargs(pcse_model), **kwargs, seed=seed)
     # env_pcse_eval = ActionLimiter(env_pcse_eval, action_limit=4)
 
-    args = parse_args()
-    tb_log_name = f'Seed-{seed}-{pcse_model_name}-{args.agent}-Ncosts-{costs_nitrogen}-run'
+    tb_log_name = f'Seed-{seed}-{pcse_model_name}-{agent}-Ncosts-{costs_nitrogen}-run'
 
     eval_callback = EvalCallback(
         env_eval=env_pcse_eval, 
@@ -165,7 +151,7 @@ def train(log_dir, n_steps,
         test_locations=test_locations, 
         seed=seed, 
         pcse_model=pcse_model,
-        eval_freq=args.eval_freq,
+        eval_freq=eval_freq,
         **kwargs)
     
     progress_callback = ProgressCallback(eval_callback, n_steps)
@@ -174,6 +160,38 @@ def train(log_dir, n_steps,
                 callback=progress_callback,
                 tb_log_name=tb_log_name)
 ...
+class ProgressCallback(BaseCallback):
+    def __init__(self, eval_callback, total_timesteps, verbose=0):
+        super(ProgressCallback, self).__init__(verbose)
+        self.eval_callback = eval_callback
+        self.pbar = None
+        self.total_timesteps = total_timesteps
+        
+    def _on_training_start(self):
+        """Initialize progress bar and set model for eval callback"""
+        self.pbar = tqdm(total=self.total_timesteps, desc="Training Progress")
+        self.eval_callback.model = self.model
+        # Do an initial evaluation
+        self.eval_callback._on_step()
+        
+    def _on_step(self):
+        """Update progress bar and run evaluation at specified frequency"""
+        self.pbar.update(1)
+        # Evaluate at regular intervals and at the start
+        if self.n_calls % self.eval_callback.eval_freq == 0 or self.n_calls == 1:
+            print(f"\nEvaluating at step {self.n_calls}/{self.total_timesteps}")
+            self.eval_callback.model = self.model
+            eval_result = self.eval_callback._on_step()
+            return eval_result
+        return True
+        
+    def _on_training_end(self):
+        """Clean up progress bar and do final evaluation"""
+        self.pbar.close()
+        # Do a final evaluation
+        self.eval_callback.model = self.model
+        self.eval_callback._on_step()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--seed", type=int, default=0, help="Set seed")
@@ -194,12 +212,17 @@ if __name__ == '__main__':
     log_dir = os.path.join(rootdir, 'tensorboard_logs', f'{pcse_model_name}_experiments')
     print(f'train for {args.nsteps} steps with costs_nitrogen={args.costs_nitrogen} (seed={args.seed})')
 
-    all_years = [*range(1990, 2022)]
+    # all_years = [*range(1990, 2022)]
+    # train_years = [year for year in all_years if year % 2 == 1]
+    # test_years = [year for year in all_years if year % 2 == 0]
+    # train_locations = [(52, 5.5), (51.5, 5), (52.5, 6.0)]
+    # test_locations = [(52, 5.5), (48, 0)]
+
+    all_years = [*range(1990, 1993)]  # Just 3 years
     train_years = [year for year in all_years if year % 2 == 1]
     test_years = [year for year in all_years if year % 2 == 0]
-
-    train_locations = [(52, 5.5), (51.5, 5), (52.5, 6.0)]
-    test_locations = [(52, 5.5), (48, 0)]
+    train_locations = [(52, 5.5)]  # Just one location
+    test_locations = [(52, 5.5)]
 
     tag = f'Seed-{args.seed}'
 
