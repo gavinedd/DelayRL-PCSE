@@ -23,8 +23,5 @@ setup(
         "scipy",
         "tqdm",
         "pandas"
-    ],
-    description="Reinforcement Learning for Crop Management",
-    author="Your Name",
-    license="EUPL",
+    ]
 )
