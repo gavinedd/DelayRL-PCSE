@@ -1,0 +1,21 @@
+PCSE-RL Project
+Copyright (C) 2024 Gavin Eddington, Braxton Geary, and Chandler Justice
+
+This project was created as a final project for CS 6110 at Utah State University.
+It incorporates components from the following software packages,
+each of which is distributed under its own license:
+
+1. Python Crop Simulation Environment (PCSE)
+   - Copyright 2015 Alterra, Wageningen-UR
+   - Website: https://github.com/ajwdewit/pcse
+   - License: European Union Public License (EUPL) v1.2
+   - Used as: Git submodule at pcse/
+
+2. PCSE-Gym (CropGym)
+   - Copyright 2023 Wageningen University and Research
+   - Website: https://github.com/BigDataWUR/PCSE-Gym
+   - License: GNU General Public License (GPL) v3.0
+   - Used as: Git submodule at PCSE-Gym/
+
+The complete text of these licenses can be found in the respective submodule directories.
+This project itself is licensed under the GNU General Public License v3.0. 
