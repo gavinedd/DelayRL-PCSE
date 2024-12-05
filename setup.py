@@ -10,7 +10,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "pcse @ file://" + os.path.join(root_dir, "pcse"),
-        "pcse_gym @ file://" + os.path.join(root_dir, "PCSE-Gym"),
+        "cropgym @ file://" + os.path.join(root_dir, "PCSE-Gym"),
         "stable-baselines3",
         "sb3-contrib",
         "gymnasium",
