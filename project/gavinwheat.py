@@ -1,6 +1,7 @@
 import datetime
 import gymnasium as gym
 import numpy as np
+import warnings
 
 from pcse_gym.envs import common_env
 from pcse_gym.utils import defaults
@@ -8,6 +9,8 @@ from pcse_gym.utils import process_pcse_output as process_pcse
 from pcse_gym.envs.sb3 import ZeroNitrogenEnvStorage, StableBaselinesWrapper
 from pcse_gym.envs.rewards import Rewards
 
+# Suppress specific matplotlib legend warning
+warnings.filterwarnings('ignore', message='No artists with labels found to put in legend')
 
 class GavinWheat(gym.Env):
     """

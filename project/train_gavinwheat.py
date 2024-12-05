@@ -14,7 +14,6 @@ from pcse_gym.envs.sb3 import get_policy_kwargs, get_model_kwargs
 from pcse_gym.utils.eval import EvalCallback, determine_and_log_optimum
 import pcse_gym.utils.defaults as defaults
 
-# Rest of implementation identical to train_winterwheat.py but using GavinWheat instead of WinterWheat
 path_to_program = lib_programname.get_path_executed_script()
 rootdir = path_to_program.parents[0]
 
