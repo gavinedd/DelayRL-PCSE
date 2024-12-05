@@ -16,6 +16,7 @@ setup(
         "gymnasium",
         "numpy",
         "torch",
-        "lib_programname"
+        "lib_programname",
+        "tensorboard"
     ],
 ) 
