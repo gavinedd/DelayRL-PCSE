@@ -26,21 +26,32 @@ git submodule update --init
 
 ## Install Packages
 
-To install the required packages in editable mode, use the following commands:
+To install all required packages (including PCSE and PCSE-Gym), simply run:
 
-1. Install `pcse`:
+```bash
+pip install -e .
+```
 
-   ```bash
-   pip install -e pcse
-   ```
+This will install:
+1. The PCSE package
+2. The PCSE-Gym package
+3. The custom project package
+4. All other dependencies
 
-2. Install `PCSE-Gym`:
+This installation is in editable mode (-e), allowing you to make changes to the code and have them immediately reflected in your environment.
 
-   ```bash
-   pip install -e PCSE-Gym
-   ```
+## Viewing Training Progress
 
-This will allow you to make changes to the code in these directories and have them immediately reflected in your environment.
+During training, the model saves progress data to the `tensorboard_logs` directory. To view these logs:
+
+```bash
+tensorboard --logdir tensorboard_logs
+```
+
+Then open `http://localhost:6006` in your web browser. The graphs show:
+- Rewards over time (higher is better)
+- Training losses (should decrease)
+- Other training statistics
 
 ## Additional Information
 
