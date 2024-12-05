@@ -12,8 +12,8 @@ Ensure you have the following installed on your system:
 First, clone the repository to your local machine:
 
 ```bash
-git clone https://github.com/gavinedd/cs6110Final
-cd cs6110Final
+git clone https://github.com/gavinedd/DelayRL-PCSE
+cd DelayRL-PCSE
 ```
 
 ## Initialize Submodules
@@ -56,10 +56,10 @@ Then open `http://localhost:6006` in your web browser. The graphs show:
 ## Project Structure
 
 ```
-cs6110Final/
+DelayRL-PCSE/
 ├── pcse/           # PCSE crop simulation models (v5.5.6)
 ├── PCSE-Gym/       # Reinforcement learning environment
-└── project/        # Custom project code for CS 6110 Final
+└── project/        # Custom project code
 ```
 
 ## Additional Information
