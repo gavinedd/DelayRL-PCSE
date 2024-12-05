@@ -8,6 +8,7 @@ import lib_programname
 import sys
 import os
 import torch.nn as nn
+from stable_baselines3.common.callbacks import BaseCallback
 
 from project.gavinwheat import GavinWheat
 from pcse_gym.envs.sb3 import get_policy_kwargs, get_model_kwargs
@@ -25,6 +26,31 @@ if rootdir not in sys.path:
 if os.path.join(rootdir, "pcse_gym") not in sys.path:
     sys.path.insert(0, os.path.join(rootdir, "pcse_gym"))
 ...
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--device', type=str, default='cpu', help='Device to run on (cpu or cuda)')
+    parser.add_argument('--seed', type=int, default=0, help='Random seed')
+    parser.add_argument('--agent', type=str, default='PPO', help='RL agent. PPO, RPPO, or DQN.')
+    parser.add_argument('--reward', type=str, default='DEF', help='Reward function. DEF, or GRO')
+    parser.add_argument('--eval_freq', type=int, default=1000, 
+                       help='Frequency of evaluation (in steps). Default: 1000')
+    return parser.parse_args()
+
+class ProgressCallback(BaseCallback):
+    def __init__(self, eval_callback, total_timesteps):
+        super().__init__()
+        self.eval_callback = eval_callback
+        self.total_timesteps = total_timesteps
+        
+    def _on_step(self):
+        if self.n_calls % self.eval_callback.eval_freq == 0 or self.n_calls == 1:
+            print(f"\nEvaluating at step {self.n_calls}/{self.total_timesteps}")
+        self.eval_callback.model = self.model
+        return self.eval_callback._on_step()
+
+    def _init_callback(self):
+        self.eval_callback.model = self.model
+
 def train(log_dir, n_steps,
           crop_features=defaults.get_wofost_default_crop_features(),
           weather_features=defaults.get_default_weather_features(),
@@ -128,13 +154,24 @@ def train(log_dir, n_steps,
                                 **get_model_kwargs(pcse_model), **kwargs, seed=seed)
     # env_pcse_eval = ActionLimiter(env_pcse_eval, action_limit=4)
 
-    tb_log_name = f'{tag}-{pcse_model_name}-Ncosts-{costs_nitrogen}-run'
+    args = parse_args()
+    tb_log_name = f'Seed-{seed}-{pcse_model_name}-{args.agent}-Ncosts-{costs_nitrogen}-run'
 
+    eval_callback = EvalCallback(
+        env_eval=env_pcse_eval, 
+        test_years=test_years,
+        train_years=train_years, 
+        train_locations=train_locations,
+        test_locations=test_locations, 
+        seed=seed, 
+        pcse_model=pcse_model,
+        eval_freq=args.eval_freq,
+        **kwargs)
+    
+    progress_callback = ProgressCallback(eval_callback, n_steps)
+    
     model.learn(total_timesteps=n_steps,
-                callback=EvalCallback(env_eval=env_pcse_eval, test_years=test_years,
-                                      train_years=train_years, train_locations=train_locations,
-                                      test_locations=test_locations, seed=seed, pcse_model=pcse_model,
-                                      **kwargs),
+                callback=progress_callback,
                 tb_log_name=tb_log_name)
 ...
 if __name__ == '__main__':
@@ -147,6 +184,8 @@ if __name__ == '__main__':
     parser.add_argument("-a", "--agent", type=str, default="PPO", help="RL agent. PPO, RPPO, or DQN.")
     parser.add_argument("-r", "--reward", type=str, default="DEF", help="Reward function. DEF, or GRO")
     parser.add_argument('-d', "--device", type=str, default="cpu")
+    parser.add_argument('--eval_freq', type=int, default=1000, 
+                       help='Frequency of evaluation (in steps). Default: 1000')
 
     parser.set_defaults(measure=True, vrr=False)
 

@@ -7,6 +7,19 @@ Ensure you have the following installed on your system:
 - Python 3.10, 3.11, or 3.12
 - pip (Python package manager)
 
+### GPU Support (Optional but Recommended)
+If you want to use GPU acceleration (highly recommended for faster training):
+
+1. NVIDIA GPU with CUDA support
+2. [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit)
+3. [NVIDIA cuDNN](https://developer.nvidia.com/cudnn)
+
+You can verify your CUDA installation by running:
+
+```bash
+nvidia-smi
+```
+
 ## Clone the Repository
 
 First, clone the repository to your local machine:
@@ -26,6 +39,7 @@ git submodule update --init
 
 ## Install Packages
 
+### Basic Installation
 To install all required packages (including PCSE and PCSE-Gym), simply run:
 
 ```bash
@@ -39,6 +53,54 @@ This will install:
 4. All other dependencies
 
 This installation is in editable mode (-e), allowing you to make changes to the code and have them immediately reflected in your environment.
+
+### GPU Support Installation
+If you have CUDA installed and want to enable GPU support:
+
+1. First, check your CUDA version:
+
+```bash
+nvidia-smi
+```
+
+2. Uninstall existing PyTorch installation:
+
+```bash
+pip uninstall torch torchvision torchaudio
+```
+
+3. Install PyTorch with CUDA support (choose the version matching your CUDA installation):
+
+```bash
+# For CUDA 12.x
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# For CUDA 11.x
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+```
+
+4. Verify your PyTorch CUDA installation:
+
+```python
+import torch
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"CUDA version: {torch.version.cuda}")
+print(f"GPU device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None'}")
+```
+
+## Running Training
+
+To start training:
+
+```bash
+# For PPO algorithm (recommended to use CPU)
+python train_gavinwheat.py --device cpu --algo ppo
+
+# For other algorithms (DQN, SAC, etc. - GPU recommended)
+python train_gavinwheat.py --device cuda --algo dqn
+```
+
+Note: The PPO (Proximal Policy Optimization) algorithm performs better on CPU due to its parallel processing nature. For other algorithms like DQN or SAC, GPU acceleration is recommended for faster training.
 
 ## Viewing Training Progress
 
