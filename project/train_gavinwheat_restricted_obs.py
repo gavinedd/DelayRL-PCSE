@@ -17,7 +17,7 @@ import pcse_gym.utils.defaults as defaults
 path_to_program = lib_programname.get_path_executed_script()
 rootdir = path_to_program.parents[0]
 
-VISIBLE_CROP_FEATURES = ['DVS', 'TGROWTH', 'LAI', 'NUPTT', 'TRAN', 'TNSOIL', 'TRAIN', 'TRANRF', 'WSO']
+VISIBLE_CROP_FEATURES = ['DVS', 'TGROWTH', 'LAI', 'NUPTT', 'TRAN', 'TNSOIL', 'WSO']
 VISIBLE_WEATHER_FEATURES = ['IRRAD', 'TMIN', 'RAIN']
 
 if rootdir not in sys.path:
@@ -192,8 +192,10 @@ if __name__ == '__main__':
           test_locations=test_locations,
           n_steps=args.nsteps, seed=args.seed,
           tag=tag, costs_nitrogen=args.costs_nitrogen,
-          crop_features=defaults.get_default_crop_features(pcse_env=args.environment),
-          weather_features=defaults.get_default_weather_features(),
+          #crop_features=defaults.get_default_crop_features(pcse_env=args.environment),
+          #weather_features=defaults.get_default_weather_features(),
+          crop_features=VISIBLE_CROP_FEATURES,
+          weather_features=VISIBLE_WEATHER_FEATURES,
           action_features=defaults.get_default_action_features(),
           action_space=defaults.get_default_action_space(),
           pcse_model=args.environment, agent=args.agent,

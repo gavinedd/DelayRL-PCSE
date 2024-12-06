@@ -43,9 +43,9 @@ class GavinWheat(gym.Env):
         *args,
         **kwargs
     ):
-        self.crop_features = selected_crop_features if selected_crop_features else crop_features
+        self.crop_features = crop_features
         self.action_features = action_features
-        self.weather_features = selected_weather_features if selected_weather_features else weather_features
+        self.weather_features = weather_features
         self.costs_nitrogen = costs_nitrogen
         self.years = [years] if isinstance(years, int) else years
         self.locations = [locations] if isinstance(locations, tuple) else locations
@@ -53,6 +53,9 @@ class GavinWheat(gym.Env):
         self.action_space = action_space
         self._timestep = timestep
         self.reward_function = reward
+        self.selected_crop_features = selected_crop_features
+        self.selected_weather_features = selected_weather_features
+
 
         if self.reward_function != "GRO":
             self._env_baseline = self._initialize_sb_wrapper(seed, *args, **kwargs)
@@ -86,12 +89,34 @@ class GavinWheat(gym.Env):
         )
 
     def _get_observation_space(self):
-        nvars = (
-            len(self.crop_features)
-            + len(self.action_features)
-            + len(self.weather_features) * self.timestep
-        )
+        selected_crop_len = len(self.selected_crop_features) if self.selected_crop_features else len(self.crop_features)
+        selected_weather_len = len(self.selected_weather_features) if self.selected_weather_features else len(self.weather_features)
+        
+        nvars = selected_crop_len + len(self.action_features) + selected_weather_len * self.timestep
         return gym.spaces.Box(0, np.inf, shape=(nvars,))
+
+
+    def filter_observation(self, obs):
+        filtered_obs = {}
+    
+        # Filter crop features
+        if self.selected_crop_features:
+            for feature in self.selected_crop_features:
+                if feature in obs:
+                    filtered_obs[feature] = obs[feature]
+    
+        # Filter weather features
+        if self.selected_weather_features:
+            for feature in self.selected_weather_features:
+                if feature in obs:
+                    filtered_obs[feature] = obs[feature]
+    
+        # If no specific features are selected, return the full observation
+        if not filtered_obs:
+            return obs
+        
+        return filtered_obs
+
 
     def step(self, action):
         """
@@ -100,6 +125,9 @@ class GavinWheat(gym.Env):
 
         obs, _, terminated, truncated, info = self._env.step(action)
 
+
+        # filter to only desired features
+        obs = self.filter_observation(obs)
         self.observation_buffer.append(obs)
         self.observation_buffer.pop(0)
 
