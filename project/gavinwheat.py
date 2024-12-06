@@ -32,6 +32,7 @@ class GavinWheat(gym.Env):
         action_space=gym.spaces.Box(0, np.inf, shape=(1,)),
         action_multiplier=1.0,
         reward=None,
+        timestep_delay=20,
         *args,
         **kwargs
     ):
@@ -53,6 +54,10 @@ class GavinWheat(gym.Env):
         self.observation_space = self._get_observation_space()
         self.zero_nitrogen_env_storage = ZeroNitrogenEnvStorage()
         self.rewards = Rewards(kwargs.get("reward_var"), self.timestep, costs_nitrogen)
+        
+        # add support for observation delays
+        self.timestep_delay = timestep_delay
+        self.observation_buffer = [np.zeros(self.observation_space.shape) for _ in range(self.timestep_delay)]
 
         super().reset(seed=seed)
     def _initialize_sb_wrapper(self, seed, *args, **kwargs):
@@ -85,8 +90,17 @@ class GavinWheat(gym.Env):
         """
 
         obs, _, terminated, truncated, info = self._env.step(action)
+
+        self.observation_buffer.append(obs)
+        self.observation_buffer.pop(0)
+
+        delayed_obs = self.get_delayed_observation()
+
+
         output = self.sb3_env.model.get_output()
-        obs, reward, growth = self.process_output(action, output, obs)
+        obs, reward, growth = self.process_output(action, output, delayed_obs)
+
+
 
         if "reward" not in info.keys():
             info["reward"] = {}
@@ -95,7 +109,12 @@ class GavinWheat(gym.Env):
             info["growth"] = {}
         info["growth"][self.date] = growth
 
-        return obs, reward, terminated, truncated, info
+        # return obs, reward, terminated, truncated, info
+        return delayed_obs, reward, terminated, truncated, info
+
+    def get_delayed_observation(self):
+        return self.observation_buffer[-1]
+
     def process_output(self, action, output, obs):
 
         if isinstance(action, np.ndarray):
@@ -168,10 +187,17 @@ class GavinWheat(gym.Env):
             self.baseline_env.reset(seed=seed)
         obs = self.sb3_env.reset(seed=seed)
 
+
+        # reset observation buffer
+        self.observation_buffer = [np.zeros(self.observation_space.shape) for _ in range(self.timestep_delay)]
+
+
         # TODO: check whether info should/could be filled
         info = {}
 
-        return obs, info
+        # return obs, info
+        return self.get_delayed_observation(), info
+
     def render(self, mode="human"):
         pass
 
