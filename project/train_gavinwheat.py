@@ -9,7 +9,7 @@ import sys
 import os
 import torch.nn as nn
 
-from project.gavinwheat import GavinWheat
+from project.cooperative.cooperative_gavinwheat import CooperativeGavinWheat
 from pcse_gym.envs.sb3 import get_policy_kwargs, get_model_kwargs
 from pcse_gym.utils.eval import EvalCallback, determine_and_log_optimum
 import pcse_gym.utils.defaults as defaults
@@ -79,7 +79,7 @@ def train(log_dir, n_steps,
                        }
         hyperparams['policy_kwargs']['net_arch'] = [256, 256]
         hyperparams['policy_kwargs']['activation_fn'] = nn.Tanh
-    env_pcse_train = GavinWheat(crop_features=crop_features, action_features=action_features,
+    env_pcse_train = CooperativeGavinWheat(crop_features=crop_features, action_features=action_features,
                                  weather_features=weather_features,
                                  costs_nitrogen=costs_nitrogen, years=train_years, locations=train_locations,
                                  action_space=action_space, action_multiplier=1.0, seed=seed,
@@ -120,7 +120,7 @@ def train(log_dir, n_steps,
                                   train_locations=train_locations, test_locations=test_locations,
                                   n_steps=args.nsteps)
 
-    env_pcse_eval = GavinWheat(crop_features=crop_features, action_features=action_features,
+    env_pcse_eval = CooperativeGavinWheat(crop_features=crop_features, action_features=action_features,
                                 weather_features=weather_features,
                                 costs_nitrogen=costs_nitrogen, years=test_years, locations=test_locations,
                                 action_space=action_space, action_multiplier=1.0, reward=reward,
