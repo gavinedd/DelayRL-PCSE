@@ -59,15 +59,22 @@ Then open `http://localhost:6006` in your web browser. The graphs show:
 DelayRL-PCSE/
 ├── pcse/           # PCSE crop simulation models (v5.5.6)
 ├── PCSE-Gym/       # Reinforcement learning environment
-└── project/        # Custom project code
+└── project/        # Our custom implementations
+    └── cooperative/  # Our cooperative farming environment
 ```
 
-## Additional Information
+## Documentation
 
-For more details on the packages used:
+### Our Implementations
+[Cooperative Farming Environment](project/cooperative/README.md) - Our multi-agent reinforcement learning system for agricultural cooperation
+  - Implements shared knowledge pools
+  - Dynamic market pricing
+  - Resource sharing mechanics
+  - Cooperative reward structures
 
-- [PCSE Documentation](https://pcse.readthedocs.io/en/stable/)
-- [PCSE-Gym Documentation](https://cropgym.ai/)
+### Third-Party Documentation
+- [PCSE Documentation](https://pcse.readthedocs.io/en/stable/) - Base crop simulation models
+- [PCSE-Gym Documentation](https://cropgym.ai/) - RL environment framework
 
 ## License & Academic Integrity Notice
 

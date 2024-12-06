@@ -91,9 +91,17 @@ class GavinWheat(gym.Env):
         selected_crop_len = len(self.selected_crop_features) if self.selected_crop_features else len(self.crop_features)
         selected_weather_len = len(self.selected_weather_features) if self.selected_weather_features else len(self.weather_features)
         
-        nvars = selected_crop_len + len(self.action_features) + selected_weather_len * self.timestep
-        return gym.spaces.Box(0, np.inf, shape=(nvars,))
-
+        nvars = (
+            selected_crop_len
+            + len(self.action_features)
+            + selected_weather_len * self.timestep
+        )
+        return gym.spaces.Box(
+            low=-10.0,
+            high=10.0,
+            shape=(nvars,),
+            dtype=np.float32
+        )
 
     def filter_observation(self, obs):
         filtered_obs = {}
