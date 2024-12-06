@@ -2,6 +2,7 @@ import datetime
 import gymnasium as gym
 import numpy as np
 import warnings
+from pcse.base import weather
 
 from pcse_gym.envs import common_env
 from pcse_gym.utils import defaults
@@ -19,6 +20,10 @@ class GavinWheat(gym.Env):
         (2) a baseline environment (e.g. with zero nitrogen policy) for computing relative reward
     Year and location of episode is randomly picked from years and locations through reset().
     """
+    
+    # crop features: ['DVS', 'TGROWTH', 'LAI', 'NUPTT', 'TRAN', 'TNSOIL', 'TRAIN', 'TRANRF', 'WSO']
+    # weather features: ['IRRAD', 'TMIN', 'RAIN']
+
     def __init__(
         self,
         crop_features=defaults.get_wofost_default_crop_features(),
@@ -33,12 +38,14 @@ class GavinWheat(gym.Env):
         action_multiplier=1.0,
         reward=None,
         timestep_delay=20,
+        selected_crop_features=None,
+        selected_weather_features=None,
         *args,
         **kwargs
     ):
-        self.crop_features = crop_features
+        self.crop_features = selected_crop_features if selected_crop_features else crop_features
         self.action_features = action_features
-        self.weather_features = weather_features
+        self.weather_features = selected_weather_features if selected_weather_features else weather_features
         self.costs_nitrogen = costs_nitrogen
         self.years = [years] if isinstance(years, int) else years
         self.locations = [locations] if isinstance(locations, tuple) else locations
@@ -58,6 +65,8 @@ class GavinWheat(gym.Env):
         # add support for observation delays
         self.timestep_delay = timestep_delay
         self.observation_buffer = [np.zeros(self.observation_space.shape) for _ in range(self.timestep_delay)]
+        
+        print(f"Observation space:\ncrop features {self.crop_features}\nweather features: {self.weather_features}")
 
         super().reset(seed=seed)
     def _initialize_sb_wrapper(self, seed, *args, **kwargs):
