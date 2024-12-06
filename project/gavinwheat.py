@@ -2,7 +2,6 @@ import datetime
 import gymnasium as gym
 import numpy as np
 import warnings
-from pcse.base import weather
 
 from pcse_gym.envs import common_env
 from pcse_gym.utils import defaults
