@@ -77,12 +77,7 @@ class GavinWheat(gym.Env):
             + len(self.action_features)
             + len(self.weather_features) * self.timestep
         )
-        return gym.spaces.Box(
-            low=-10.0,
-            high=10.0,
-            shape=(nvars,),
-            dtype=np.float32
-        )
+        return gym.spaces.Box(0, np.inf, shape=(nvars,))
 
     def step(self, action):
         """
