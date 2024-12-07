@@ -36,7 +36,7 @@ class GavinWheat(gym.Env):
         action_space=gym.spaces.Box(0, np.inf, shape=(1,)),
         action_multiplier=1.0,
         reward=None,
-        timestep_delay=20,
+        timestep_delay=0,
         selected_crop_features=None,
         selected_weather_features=None,
         *args,
@@ -129,12 +129,15 @@ class GavinWheat(gym.Env):
         obs = self.filter_observation(obs)
         self.observation_buffer.append(obs)
         self.observation_buffer.pop(0)
-
         delayed_obs = self.get_delayed_observation()
 
 
         output = self.sb3_env.model.get_output()
-        obs, reward, growth = self.process_output(action, output, delayed_obs)
+        if self.timestep_delay > 0:
+            obs, reward, growth = self.process_output(action, output, delayed_obs)
+        else:
+            obs, reward, growth = self.process_output(action, output, obs)
+
 
 
 
@@ -146,10 +149,16 @@ class GavinWheat(gym.Env):
         info["growth"][self.date] = growth
 
         # return obs, reward, terminated, truncated, info
-        return delayed_obs, reward, terminated, truncated, info
+        if self.timestep_delay > 0:
+            return delayed_obs, reward, terminated, truncated, info
+        else:
+            return obs, reward, terminated, truncated, info
 
     def get_delayed_observation(self):
-        return self.observation_buffer[-1]
+        if len(self.observation_buffer) > 0:
+            return self.observation_buffer[-1]
+        else:
+            return None
 
     def process_output(self, action, output, obs):
 
@@ -232,7 +241,10 @@ class GavinWheat(gym.Env):
         info = {}
 
         # return obs, info
-        return self.get_delayed_observation(), info
+        if self.timestep_delay > 0:
+            return self.get_delayed_observation(), info
+        else:
+            return obs, info
 
     def render(self, mode="human"):
         pass
