@@ -245,6 +245,7 @@ def train(log_dir, n_steps,
           pcse_model=0, agent=PPO, reward=None,
           seed=0, tag="Exp", costs_nitrogen=10.0,
           n_farms=3, random_obfuscation=False, max_delay=0, **kwargs):
+
     """
     Train multiple cooperative PPO agents.
     """
@@ -409,8 +410,10 @@ if __name__ == '__main__':
     parser.add_argument("-r", "--reward", type=str, default="DEF", help="Reward function. DEF, or GRO")
     parser.add_argument("-f", "--farms", type=int, default=3, help="Number of cooperative farms")
     parser.add_argument('-d', "--device", type=str, default="cpu")
+
     parser.add_argument('-o', '--obfuscation', type=bool, default=False, help="Enable randomly obfuscating features related to farms.")
     parser.add_argument('-t', '--timestep_delay', type=int, default=0, help="Maximum number of timesteps for a farm. actually delay will be randomly selected between (0, [timestep_delay]")
+
     parser.set_defaults(measure=True, vrr=False)
 
     args = parser.parse_args()
