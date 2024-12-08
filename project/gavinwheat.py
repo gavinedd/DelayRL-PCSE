@@ -19,6 +19,10 @@ class GavinWheat(gym.Env):
         (2) a baseline environment (e.g. with zero nitrogen policy) for computing relative reward
     Year and location of episode is randomly picked from years and locations through reset().
     """
+    
+    # crop features: ['DVS', 'TGROWTH', 'LAI', 'NUPTT', 'TRAN', 'TNSOIL', 'TRAIN', 'TRANRF', 'WSO']
+    # weather features: ['IRRAD', 'TMIN', 'RAIN']
+
     def __init__(
         self,
         crop_features=defaults.get_wofost_default_crop_features(),
@@ -32,6 +36,9 @@ class GavinWheat(gym.Env):
         action_space=gym.spaces.Box(0, np.inf, shape=(1,)),
         action_multiplier=1.0,
         reward=None,
+        timestep_delay=20,
+        selected_crop_features=None,
+        selected_weather_features=None,
         *args,
         **kwargs
     ):
@@ -45,6 +52,9 @@ class GavinWheat(gym.Env):
         self.action_space = action_space
         self._timestep = timestep
         self.reward_function = reward
+        self.selected_crop_features = selected_crop_features
+        self.selected_weather_features = selected_weather_features
+
 
         if self.reward_function != "GRO":
             self._env_baseline = self._initialize_sb_wrapper(seed, *args, **kwargs)
@@ -53,6 +63,12 @@ class GavinWheat(gym.Env):
         self.observation_space = self._get_observation_space()
         self.zero_nitrogen_env_storage = ZeroNitrogenEnvStorage()
         self.rewards = Rewards(kwargs.get("reward_var"), self.timestep, costs_nitrogen)
+        
+        # add support for observation delays
+        self.timestep_delay = timestep_delay
+        self.observation_buffer = [np.zeros(self.observation_space.shape) for _ in range(self.timestep_delay)]
+        
+        print(f"Observation space:\ncrop features {self.crop_features}\nweather features: {self.weather_features}")
 
         super().reset(seed=seed)
     def _initialize_sb_wrapper(self, seed, *args, **kwargs):
@@ -72,12 +88,37 @@ class GavinWheat(gym.Env):
         )
 
     def _get_observation_space(self):
+        selected_crop_len = len(self.selected_crop_features) if self.selected_crop_features else len(self.crop_features)
+        selected_weather_len = len(self.selected_weather_features) if self.selected_weather_features else len(self.weather_features)
+        
         nvars = (
-            len(self.crop_features)
+            selected_crop_len
             + len(self.action_features)
-            + len(self.weather_features) * self.timestep
+            + selected_weather_len * self.timestep
         )
         return gym.spaces.Box(0, np.inf, shape=(nvars,))
+
+    def filter_observation(self, obs):
+        filtered_obs = {}
+    
+        # Filter crop features
+        if self.selected_crop_features:
+            for feature in self.selected_crop_features:
+                if feature in obs:
+                    filtered_obs[feature] = obs[feature]
+    
+        # Filter weather features
+        if self.selected_weather_features:
+            for feature in self.selected_weather_features:
+                if feature in obs:
+                    filtered_obs[feature] = obs[feature]
+    
+        # If no specific features are selected, return the full observation
+        if not filtered_obs:
+            return obs
+        
+        return filtered_obs
+
 
     def step(self, action):
         """
@@ -85,8 +126,23 @@ class GavinWheat(gym.Env):
         """
 
         obs, _, terminated, truncated, info = self._env.step(action)
+
+
+        # filter to only desired features
+        obs = self.filter_observation(obs)
+        self.observation_buffer.append(obs)
+        self.observation_buffer.pop(0)
+        delayed_obs = self.get_delayed_observation()
+
+
         output = self.sb3_env.model.get_output()
-        obs, reward, growth = self.process_output(action, output, obs)
+        if self.timestep_delay > 0:
+            obs, reward, growth = self.process_output(action, output, delayed_obs)
+        else:
+            obs, reward, growth = self.process_output(action, output, obs)
+
+
+
 
         if "reward" not in info.keys():
             info["reward"] = {}
@@ -95,7 +151,18 @@ class GavinWheat(gym.Env):
             info["growth"] = {}
         info["growth"][self.date] = growth
 
-        return obs, reward, terminated, truncated, info
+        # return obs, reward, terminated, truncated, info
+        if self.timestep_delay > 0:
+            return delayed_obs, reward, terminated, truncated, info
+        else:
+            return obs, reward, terminated, truncated, info
+
+    def get_delayed_observation(self):
+        if len(self.observation_buffer) > 0:
+            return self.observation_buffer[-1]
+        else:
+            return None
+
     def process_output(self, action, output, obs):
 
         if isinstance(action, np.ndarray):
@@ -168,10 +235,20 @@ class GavinWheat(gym.Env):
             self.baseline_env.reset(seed=seed)
         obs = self.sb3_env.reset(seed=seed)
 
+
+        # reset observation buffer
+        self.observation_buffer = [np.zeros(self.observation_space.shape) for _ in range(self.timestep_delay)]
+
+
         # TODO: check whether info should/could be filled
         info = {}
 
-        return obs, info
+        # return obs, info
+        if self.timestep_delay > 0:
+            return self.get_delayed_observation(), info
+        else:
+            return obs, info
+
     def render(self, mode="human"):
         pass
 
