@@ -8,6 +8,7 @@ import os
 import sys
 import argparse
 import lib_programname
+import random
 from sb3_contrib import RecurrentPPO
 
 from stable_baselines3 import PPO, DQN
@@ -99,10 +100,23 @@ class DictToBoxWrapper(gym.ObservationWrapper):
 
 def create_cooperative_env(farm_id, crop_features, action_features, weather_features,
                          costs_nitrogen, years, locations, action_space, seed,
-                         reward, market, shared_resources, knowledge_pool, pcse_model=0, **kwargs):
+                         reward, market, shared_resources, knowledge_pool, pcse_model=0, 
+                         random_obfuscation=False, max_delay=0, **kwargs):
     """Create a cooperative farm environment"""
-    
+    delay_amount = random.randint(0, max_delay)
+    if random_obfuscation:
+        exclude_crop_features_canidates = ['LAI', 'TRAN', 'LAI', 'TRAIN', 'TRANRF']
+        exclude_weather_features_canidates = ['RAIN', 'TMIN', 'IRRAD']
+        
+        exclude_crop_features = random.sample(exclude_crop_features_canidates, 2)
+        exclude_weather_features = random.sample(exclude_weather_features_canidates, 1)
+    else:
+        exclude_crop_features = []
+        exclude_weather_features = []
+
     env = CooperativeFarmEnv(
+        exclude_crop_features=exclude_crop_features,
+        exclude_weather_features=exclude_weather_features,
         farm_id=farm_id,
         market=market,
         shared_resources=shared_resources,
@@ -117,6 +131,7 @@ def create_cooperative_env(farm_id, crop_features, action_features, weather_feat
         action_multiplier=1.0,
         seed=seed,
         reward=reward,
+        delay_steps=delay_amount,
         **get_model_kwargs(pcse_model),
         **kwargs
     )
@@ -126,7 +141,7 @@ def create_cooperative_env(farm_id, crop_features, action_features, weather_feat
 
 def make_env(farm_id, crop_features, action_features, weather_features,
              costs_nitrogen, years, locations, action_space, seed,
-             reward, market, shared_resources, knowledge_pool, pcse_model=0, **kwargs):
+             reward, market, shared_resources, knowledge_pool, pcse_model=0, random_obfuscation=False, max_delay=0, **kwargs):
     """Create a function that creates and returns a new environment instance"""
     def _init():
         env = create_cooperative_env(
@@ -144,6 +159,8 @@ def make_env(farm_id, crop_features, action_features, weather_features,
             shared_resources=shared_resources,
             knowledge_pool=knowledge_pool,
             pcse_model=pcse_model,
+            random_obfuscation=random_obfuscation,
+            max_delay=max_delay,
             **kwargs
         )
         env = Monitor(env)
@@ -227,7 +244,7 @@ def train(log_dir, n_steps,
           action_space=defaults.get_default_action_space(),
           pcse_model=0, agent=PPO, reward=None,
           seed=0, tag="Exp", costs_nitrogen=10.0,
-          n_farms=3, **kwargs):
+          n_farms=3, random_obfuscation=False, max_delay=0, **kwargs):
     """
     Train multiple cooperative PPO agents.
     """
@@ -314,6 +331,8 @@ def train(log_dir, n_steps,
             shared_resources=shared_resources,
             knowledge_pool=knowledge_pool,
             pcse_model=pcse_model,
+            random_obfuscation=random_obfuscation,
+            max_delay=max_delay,
             **kwargs
         )
         env_fns.append(env_fn)
@@ -390,7 +409,8 @@ if __name__ == '__main__':
     parser.add_argument("-r", "--reward", type=str, default="DEF", help="Reward function. DEF, or GRO")
     parser.add_argument("-f", "--farms", type=int, default=3, help="Number of cooperative farms")
     parser.add_argument('-d', "--device", type=str, default="cpu")
-
+    parser.add_argument('-o', '--obfuscation', type=bool, default=False, help="Enable randomly obfuscating features related to farms.")
+    parser.add_argument('-t', '--timestep_delay', type=int, default=0, help="Maximum number of timesteps for a farm. actually delay will be randomly selected between (0, [timestep_delay]")
     parser.set_defaults(measure=True, vrr=False)
 
     args = parser.parse_args()
@@ -418,4 +438,4 @@ if __name__ == '__main__':
           action_space=defaults.get_default_action_space(),
           pcse_model=args.environment, agent=args.agent,
           reward=args.reward, device=args.device,
-          n_farms=args.farms)
+          n_farms=args.farms, random_obfuscation=args.obfuscation, max_delay=args.timestep_delay)

@@ -4,7 +4,7 @@ from typing import Tuple, Dict, Any, List, Optional
 import logging
 from gymnasium import spaces
 from datetime import datetime
-
+from collections import deque
 class CooperativeFarmEnv(gym.Env):
     """Single farm environment with cooperation mechanisms"""
     def __init__(self, farm_id: int, market, shared_resources, knowledge_pool,
@@ -14,9 +14,30 @@ class CooperativeFarmEnv(gym.Env):
                  action_space: spaces.Box, action_multiplier: float = 1.0,
                  seed: Optional[int] = None, reward: Optional[str] = None,
                  max_yield: float = 1000.0, max_steps: int = 100,
-                 **kwargs):
+                 exclude_crop_features=None, exclude_weather_features=None,
+                 delay_steps=0, **kwargs):
         super().__init__()
         
+        # Default to empty list if no exclusions are provided
+        if exclude_crop_features is None:
+            exclude_crop_features = []
+        if exclude_weather_features is None:
+            exclude_weather_features = []
+
+        # Define original features
+        self.original_crop_features = ['DVS', 'TGROWTH', 'LAI', 'NUPTT', 'TRAN', 'TNSOIL', 'TRAIN', 'TRANRF', 'WSO']
+        self.original_weather_features = ['IRRAD', 'TMIN', 'RAIN']
+
+        # Set excluded features (mask them during observation)
+        self.exclude_crop_features = exclude_crop_features
+        self.exclude_weather_features = exclude_weather_features
+
+        # Create masks for excluded features
+        self.crop_feature_mask = [feature not in self.exclude_crop_features for feature in self.original_crop_features]
+        self.weather_feature_mask = [feature not in self.exclude_weather_features for feature in self.original_weather_features]
+
+
+
         # Store cooperative components
         self.farm_id = farm_id
         self.market = market
@@ -81,10 +102,18 @@ class CooperativeFarmEnv(gym.Env):
         self.observation_space = spaces.Dict(obs_spaces)
         
         self.logger = logging.getLogger(__name__)
+
+        # Set delay steps
+        self.delay_steps = delay_steps
+        self.observation_buffer = deque(maxlen=delay_steps)  # Buffer to store past observations
+        
         
         # Initialize farm state
         self._initialize_farm_state()
-        
+
+        print(f"FARM {self.farm_id}\nPERCEPTION DELAY: {self.delay_steps}\nFEATURES:\ncrops: {self.crop_features} EXCLUDING: {self.exclude_crop_features}\nweather: {self.weather_features} EXCLUDING: {self.exclude_weather_features}\nactions:{self.action_features}")
+
+
     @property
     def date(self):
         """Get current date"""
@@ -126,6 +155,7 @@ class CooperativeFarmEnv(gym.Env):
         try:
             self.current_step += 1
             
+            # Update farm state
             self._update_farm_state(action)
             
             # Calculate base yield with clipping
@@ -191,7 +221,16 @@ class CooperativeFarmEnv(gym.Env):
             self.previous_action = np.array([np.mean(action)], dtype=np.float32)
             
             # Create observation
-            obs = self._get_observation()
+            current_observation = self._get_observation()
+    
+            # Add the current observation to the buffer for delayed observation
+            self.observation_buffer.append(current_observation)
+            
+            # If delay > 0, return the delayed observation from the buffer
+            if self.delay_steps > 0 and len(self.observation_buffer) >= self.delay_steps:
+                delayed_observation = self.observation_buffer[0]  # Oldest observation in the buffer
+            else:
+                delayed_observation = current_observation  # No delay, return current observation
             
             # Check for episode termination
             terminated = self.current_step >= self.max_steps
@@ -205,11 +244,12 @@ class CooperativeFarmEnv(gym.Env):
                 'yield': float(current_yield)
             }
             
-            return obs, float(final_reward), terminated, truncated, info
-            
+            return delayed_observation, float(final_reward), terminated, truncated, info
+        
         except Exception as e:
             self.logger.error(f"Error in step: {e}")
             return self._get_observation(), 0.0, True, False, {}
+
     
     def _update_farm_state(self, action: np.ndarray) -> None:
         """Update farm state based on action and time"""
@@ -260,6 +300,16 @@ class CooperativeFarmEnv(gym.Env):
         prev_action = np.clip(self.previous_action, 0.0, 1.0)
         prev_action = np.nan_to_num(prev_action, nan=0.0)
         
+        # Mask excluded crop and weather features (set them to NaN or 0.0)
+        full_crop_state = np.copy(crop_state)  # Copy the original state
+        full_weather = np.copy(weather)  # Copy the original state
+        
+        # Apply masks: set excluded crop/weather features to NaN or 0.0
+        full_crop_state[~np.array(self.crop_feature_mask)] = 0.0  # Exclude features (set to NaN or 0.0)
+        full_weather[~np.array(self.weather_feature_mask)] = 0.0  # Exclude features (set to NaN or 0.0)
+        
+
+
         # Calculate cooperative features with numerical stability
         market_price = float(self.market.price_history[-1] if self.market.price_history else self.market.base_price)
         market_price = np.clip(market_price / (2 * self.market.base_price), 0.0, 1.0)

@@ -36,7 +36,7 @@ class GavinWheat(gym.Env):
         action_space=gym.spaces.Box(0, np.inf, shape=(1,)),
         action_multiplier=1.0,
         reward=None,
-        timestep_delay=0,
+        timestep_delay=20,
         selected_crop_features=None,
         selected_weather_features=None,
         *args,
