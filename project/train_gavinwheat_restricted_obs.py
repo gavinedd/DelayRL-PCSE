@@ -9,13 +9,16 @@ import sys
 import os
 import torch.nn as nn
 
-from project.cooperative.cooperative_gavinwheat import CooperativeGavinWheat
+from project.gavinwheat import GavinWheat
 from pcse_gym.envs.sb3 import get_policy_kwargs, get_model_kwargs
 from pcse_gym.utils.eval import EvalCallback, determine_and_log_optimum
 import pcse_gym.utils.defaults as defaults
 
 path_to_program = lib_programname.get_path_executed_script()
 rootdir = path_to_program.parents[0]
+
+VISIBLE_CROP_FEATURES = ['DVS', 'TGROWTH', 'LAI', 'NUPTT', 'TRAN', 'TNSOIL', 'WSO']
+VISIBLE_WEATHER_FEATURES = ['IRRAD', 'TMIN', 'RAIN']
 
 if rootdir not in sys.path:
     print(f'insert {os.path.join(rootdir)}')
@@ -79,11 +82,22 @@ def train(log_dir, n_steps,
                        }
         hyperparams['policy_kwargs']['net_arch'] = [256, 256]
         hyperparams['policy_kwargs']['activation_fn'] = nn.Tanh
-    env_pcse_train = CooperativeGavinWheat(crop_features=crop_features, action_features=action_features,
-                                 weather_features=weather_features,
-                                 costs_nitrogen=costs_nitrogen, years=train_years, locations=train_locations,
-                                 action_space=action_space, action_multiplier=1.0, seed=seed,
-                                 reward=reward, **get_model_kwargs(pcse_model), **kwargs)
+    env_pcse_train = GavinWheat(
+            crop_features=crop_features, 
+            action_features=action_features,
+            weather_features=weather_features,
+            costs_nitrogen=costs_nitrogen, 
+            years=train_years, 
+            locations=train_locations,
+            action_space=action_space, 
+            action_multiplier=1.0, 
+            seed=seed,
+            reward=reward, 
+            selected_crop_features=VISIBLE_CROP_FEATURES,
+            selected_weather_features=VISIBLE_WEATHER_FEATURES,
+            **get_model_kwargs(pcse_model), 
+            **kwargs
+            )
 
     env_pcse_train = Monitor(env_pcse_train)
 
@@ -120,11 +134,21 @@ def train(log_dir, n_steps,
                                   train_locations=train_locations, test_locations=test_locations,
                                   n_steps=args.nsteps)
 
-    env_pcse_eval = CooperativeGavinWheat(crop_features=crop_features, action_features=action_features,
-                                weather_features=weather_features,
-                                costs_nitrogen=costs_nitrogen, years=test_years, locations=test_locations,
-                                action_space=action_space, action_multiplier=1.0, reward=reward,
-                                **get_model_kwargs(pcse_model), **kwargs, seed=seed)
+    env_pcse_eval = GavinWheat(
+            crop_features=crop_features, 
+            action_features=action_features,
+            weather_features=weather_features,
+            costs_nitrogen=costs_nitrogen, 
+            years=test_years, 
+            locations=test_locations,
+            action_space=action_space, 
+            action_multiplier=1.0, 
+            reward=reward,
+            selected_crop_features=VISIBLE_CROP_FEATURES,
+            selected_weather_features=VISIBLE_WEATHER_FEATURES,
+            **get_model_kwargs(pcse_model), 
+            **kwargs, seed=seed
+            )
     # env_pcse_eval = ActionLimiter(env_pcse_eval, action_limit=4)
 
     tb_log_name = f'{tag}-{pcse_model_name}-Ncosts-{costs_nitrogen}-run'
@@ -168,8 +192,10 @@ if __name__ == '__main__':
           test_locations=test_locations,
           n_steps=args.nsteps, seed=args.seed,
           tag=tag, costs_nitrogen=args.costs_nitrogen,
-          crop_features=defaults.get_default_crop_features(pcse_env=args.environment),
-          weather_features=defaults.get_default_weather_features(),
+          #crop_features=defaults.get_default_crop_features(pcse_env=args.environment),
+          #weather_features=defaults.get_default_weather_features(),
+          crop_features=VISIBLE_CROP_FEATURES,
+          weather_features=VISIBLE_WEATHER_FEATURES,
           action_features=defaults.get_default_action_features(),
           action_space=defaults.get_default_action_space(),
           pcse_model=args.environment, agent=args.agent,
